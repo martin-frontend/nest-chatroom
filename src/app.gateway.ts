@@ -9,10 +9,10 @@ import { Socket, Server } from 'socket.io';
 @WebSocketGateway()
 export class AppGateway {
   @WebSocketServer() server: Server;
-  users = {};
   record = {
     userCount: 0,
     messages: [],
+    users: {},
   };
   name = [];
   private logger: Logger = new Logger('AppGateway');
@@ -25,8 +25,7 @@ export class AppGateway {
 
   @SubscribeMessage('login')
   handleLogin(client: Socket, payload: string): void {
-    // this.name = payload;
-    this.users[client.id] = payload;
+    this.record.users[client.id] = payload;
     this.record.messages.push({
       message: '已連線',
       name: payload,
@@ -40,8 +39,18 @@ export class AppGateway {
     this.server.emit('userCount', payload);
   }
 
+  @SubscribeMessage('sendImage')
+  handleSendImage(client: Socket, payload: string): void {
+    const name = this.record.users[client.id];
+    this.record.messages.push({
+      message: payload,
+      name,
+      type: 'img',
+    });
+    this.server.emit('msgToClient', this.record);
+  }
+
   handleLogout(client: Socket, payload: string): void {
-    // this.name = payload;
     this.record.messages.push({
       message: '已下線',
       name: payload,
@@ -55,18 +64,17 @@ export class AppGateway {
   }
 
   handleDisconnect(client: Socket) {
-    console.log(this.users);
     this.record.messages.push({
       message: '已離線',
-      name: this.users[client.id],
+      name: this.record.users[client.id],
       type: 'system',
     });
+    delete this.record.users[client.id];
     this.server.emit('msgToClient', this.record);
-    this.logger.log(`Client disconnected: ${client.id}, ${this.users}`);
+    this.logger.log(`Client disconnected: ${client.id}, ${this.record.users}`);
   }
 
   handleConnection(client: Socket, ...args: any[]) {
-    // console.log(client);
-    this.logger.log(`Client connected: ${client.id}, ${this.users}`);
+    this.logger.log(`Client connected: ${client.id}, ${this.record.users}`);
   }
 }
